@@ -1,0 +1,49 @@
+[package]
+name = "vsearch"
+kind = "tool"
+version = "2.31.0"
+release = 1
+license = "Apache-2.0"
+main = "src/main.taf"
+
+[repository]
+url = "https://github.com/taffish/vsearch"
+
+[command]
+name = "taf-vsearch"
+
+[runtime]
+pipe = true
+command_mode = true
+
+[container]
+image = "ghcr.io/taffish/vsearch:2.31.0-r1"
+dockerfile = "docker/Dockerfile"
+build_platforms = "linux/amd64,linux/arm64"
+
+[meta]
+domain = "bio"
+categories = ["microbiome", "amplicon-analysis", "sequence-search", "clustering", "quality-control"]
+keywords = ["vsearch", "microbiome", "amplicon", "OTU", "chimera", "clustering", "dereplication", "FASTQ", "FASTA", "USEARCH"]
+description = "VSEARCH 2.31.0 command-line runtime for amplicon and metagenomic sequence searching, clustering, dereplication, chimera detection, and FASTA/FASTQ processing."
+
+[upstream]
+name = "VSEARCH"
+type = "github"
+repo = "torognes/vsearch"
+homepage = "https://github.com/torognes/vsearch"
+manual = "https://torognes.github.io/vsearch/"
+release_url = "https://github.com/torognes/vsearch/releases/tag/v2.31.0"
+downloads = "https://github.com/torognes/vsearch/releases/download/v2.31.0/vsearch-2.31.0-linux-x86_64.tar.gz; https://github.com/torognes/vsearch/releases/download/v2.31.0/vsearch-2.31.0-linux-aarch64.tar.gz"
+version = "2.31.0"
+license = "GPL-3.0-or-later OR BSD-2-Clause"
+citation = "Rognes et al. 2016, VSEARCH: a versatile open source tool for metagenomics, PeerJ"
+doi = "10.7717/peerj.2584"
+watch = "tags"
+strip_prefix = "v"
+
+[smoke]
+backend = "docker"
+timeout = 180
+exist = ["vsearch", "gzip", "bzip2", "ldd", "sh", "bash", "grep", "sed"]
+test = ["vsearch --version 2>&1 | grep -F 'vsearch v2.31.0' >/dev/null", "vsearch --help 2>&1 | grep -F -- '--usearch_global' >/dev/null && vsearch --help 2>&1 | grep -F -- '--fastq_mergepairs' >/dev/null && vsearch --help 2>&1 | grep -F -- '--uchime_denovo' >/dev/null", "ldd \"$(command -v vsearch)\" > /tmp/taf-vsearch-ldd.txt 2>&1 || true; if grep -F 'not found' /tmp/taf-vsearch-ldd.txt; then exit 1; fi", "/opt/vsearch/share/testdata/vsearch-smoke.sh /tmp/taf-vsearch-index-smoke-$$"]
