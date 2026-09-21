@@ -1,226 +1,249 @@
-# vsearch
+# VSEARCH
 
-TAFFISH tool app for [VSEARCH](https://github.com/torognes/vsearch), a
-versatile open-source command-line toolkit for amplicon and metagenomic
-sequence processing.
+TAFFISH tool app for [VSEARCH](https://github.com/torognes/vsearch), an open-source
+nucleotide sequence processing and global-search CLI.
 
-## Package Identity
+## Identity and installation
 
-- App name: `vsearch`
-- Command: `taf-vsearch`
-- TAFFISH version: `2.31.0-r1`
-- App kind: `tool`
-- Container image: `ghcr.io/taffish/vsearch:2.31.0-r1`
-- Upstream: `torognes/vsearch` tag `v2.31.0`
-- Runtime source: official VSEARCH GitHub release binaries
-- Upstream runtime version: `vsearch v2.31.0`
-- Upstream license: `GPL-3.0-or-later OR BSD-2-Clause`
-- TAFFISH wrapper license: `Apache-2.0`
+- Package: `vsearch 2.32.0-r1`; command: `taf-vsearch`.
+- Image: `ghcr.io/taffish/vsearch:2.32.0-r1`.
+- Upstream: `torognes/vsearch` tag `v2.32.0`, commit
+  `d44d6da51f7fe0b4281f02af76d04923f2075e61`.
+- Native platforms: `linux/amd64` and `linux/arm64`.
+- Runtime: unmodified official, SHA256-verified release binaries; no algorithm patches.
+- Wrapper: Apache-2.0; upstream: GPL-3.0-or-later OR BSD-2-Clause.
 
-## What Is Packaged
+Once this candidate is published and indexed, install the pinned app:
 
-- `vsearch`: upstream command-line executable from the official `v2.31.0`
-  release.
-- Upstream README, man page, PDF manual, and license files under
-  `/opt/vsearch/share`.
-- Standard shell utilities used by smoke tests and common compressed-input
-  workflows: `gzip`, `bzip2`, `grep`, `sed`, and `bash`.
-- A tiny offline smoke fixture at
-  `/opt/vsearch/share/testdata/vsearch-smoke.sh`.
-
-The image chooses the official upstream binary by target architecture:
-
-- `linux/amd64`: `vsearch-2.31.0-linux-x86_64.tar.gz`
-- `linux/arm64`: `vsearch-2.31.0-linux-aarch64.tar.gz`
-
-Both downloads are checksum-verified during image build using the SHA256
-digests published in the GitHub release metadata.
-
-## Scope
-
-This app exposes the VSEARCH CLI, including the main command families documented
-by upstream:
-
-- chimera detection: `--uchime_denovo`, `--uchime2_denovo`,
-  `--uchime3_denovo`, `--uchime_ref`
-- clustering: `--cluster_fast`, `--cluster_size`, `--cluster_smallmem`,
-  `--cluster_unoise`
-- dereplication and rereplication: `--fastx_uniques`,
-  `--derep_fulllength`, `--derep_id`, `--derep_prefix`, `--derep_smallmem`,
-  `--rereplicate`
-- FASTA/FASTQ/SFF processing: filtering, conversion, stats, merging, reverse
-  complementation, sorting, shuffling, masking, and subsampling
-- searching and alignment: `--search_exact`, `--usearch_global`,
-  `--allpairs_global`
-- UDB database handling: `--makeudb_usearch`, `--udb2fasta`, `--udbinfo`,
-  `--udbstats`
-- taxonomic classification with `--sintax`
-
-This app does not bundle reference databases, taxonomy databases, QIIME/Galaxy
-wrappers, biom conversion tools, downstream reports, or the experimental
-libvsearch developer API. It is a CLI runtime, not a C/C++ development SDK.
-
-## Basic Usage
-
-Show upstream version and help:
-
-```bash
+```sh
+taf update
+taf install vsearch 2.32.0-r1
+taf-vsearch-v2.32.0-r1 --version
 taf-vsearch vsearch --version
-taf-vsearch vsearch --help
 ```
 
-Global search against a user-provided FASTA database:
+During local development, `taf check` and `taf build` create
+`target/taf-vsearch-v2.32.0-r1`; building the wrapper does not build the image.
+The unversioned alias follows the latest installed local version; use the
+versioned command when this exact package is required. For an argument containing
+spaces preserve an inner quote, for example `--db "'references/my db.fa'"`.
 
-```bash
-taf-vsearch vsearch \
-  --usearch_global queries.fa \
-  --db database.fa \
-  --id 0.97 \
-  --blast6out hits.tsv
+## Scope and upstream changes
+
+The complete upstream CLI is exposed: clustering, dereplication, chimera detection,
+FASTA/FASTQ/SFF processing, paired-read merging, global/exact search, SINTAX and UDB.
+VSEARCH is nucleotide-only; it is not a protein search or local alignment tool.
+
+[2.32.0](https://github.com/torognes/vsearch/releases/tag/v2.32.0) adds
+`--scramble` (k-mer-preserving randomization), `--fastx_syncpairs` (paired-read
+synchronization), `--allow_fewer` for subsampling, and Solexa-to-Phred conversion.
+It also fixes quality aggregation, SINTAX reproducibility and UDB validation.
+Invalid values and output failures are rejected more strictly. FASTQ maximum
+quality defaults changed; set quality encoding/ranges explicitly when appropriate.
+`--search_exact --lcaout` was never implemented and is now rejected; use the
+documented `--usearch_global` route for LCA output. See upstream release notes for
+the complete change list; old pipeline outputs are not guaranteed byte-identical.
+
+The image retains man sections 1/5/7, README, NEWS, licenses, binary provenance,
+package inventory and upstream Bash/Zsh/Fish completion files under
+`/opt/vsearch/share`. Completion files describe the **upstream `vsearch` executable**,
+not the host `taf-vsearch` wrapper; no host shell configuration is installed.
+The old PDF manual is not in these binary assets; use the packaged man sources or
+[online documentation](https://torognes.github.io/vsearch/).
+
+Officially linked Galaxy IUC and QIIME 2 integrations are independent host
+environments/plugins, not a VSEARCH GUI/service or executable bundled with this
+release. They remain separately installed integrations. GPU, browser ports and
+GUI lifecycle handling are N/A. The experimental C++ API/development SDK, BIOM
+conversion tools and downstream reports are outside this CLI runtime.
+
+## Usage and outputs
+
+```sh
+taf-vsearch --help                  # installed wrapper task help
+taf-vsearch vsearch --help          # upstream options
+taf-vsearch -- --version            # default-command option forwarding
+taf-vsearch vsearch --fastx_uniques reads.fa --fastaout unique.fa --sizeout
+taf-vsearch vsearch --cluster_fast unique.fa --id 0.97 --centroids otus.fa --uc clusters.uc
+taf-vsearch vsearch --usearch_global queries.fa --db reference.fa --id 0.97 --blast6out hits.tsv
+taf-vsearch vsearch --fastq_mergepairs R1.fq --reverse R2.fq --fastqout merged.fq
+taf-vsearch vsearch --scramble reads.fa --scramble_kmer 2 --randseed 42 --fastaout shuffled.fa
 ```
 
-Dereplicate FASTA/FASTQ sequences:
+Run from a writable working directory containing your inputs; normal commands do
+not download resources. FASTA/FASTQ gzip and bzip2 input is supported. Search gives
+BLAST6/SAM/alignment or selected tabular outputs; clustering gives centroids/UC/
+OTU tables; filters/merges give sequence files. Explicitly select thresholds,
+masking, strand, thread count and output names. Existing output paths can be
+overwritten by upstream: use a new output directory. Large comparisons require
+substantial RAM; tiny smoke is not scientific or production-scale qualification.
 
-```bash
-taf-vsearch vsearch \
-  --fastx_uniques reads.fa \
-  --fastaout uniques.fa \
-  --sizeout
+## Reference and taxonomy resources
+
+Project-specific FASTA is user input. Reusable public reference/taxonomy releases
+are selectable resources, not a mandatory universal database. Nothing is bundled
+or selected automatically. `--db` is the authoritative resource override: choosing
+a different reference silently would change the scientific meaning of a run.
+There is consequently no implicit discovery/fallback, download-on-analysis, model
+cache, or magic mounted marker. Omit the explicit bind to disable shared access.
+
+`vsearch-db` prepares **one explicitly selected, fixed recipe** from HTTPS or
+already downloaded local files. It validates exact size/SHA256, preserves source
+and permission notices, resumes downloads, locks concurrent installation, verifies
+existing members and atomically promotes a complete member without overwriting.
+Directories/files become 0755/0644 for ordinary-user read-only reuse; installer
+cache is 0700. It does not unpack archives or convert taxonomy formats. gzip/bzip2
+FASTA can be retained as such. SINTAX needs appropriately formatted `;tax=...;`
+headers; raw SILVA headers must not be assumed SINTAX-compatible.
+
+Create a reviewed JSON recipe using actual immutable URLs, exact byte counts and
+independently checked SHA256 values; the following is a **schema illustration**,
+not a downloadable catalog entry:
+
+```json
+{
+  "schema": "taffish.vsearch.recipe.v1",
+  "id": "chosen-reference",
+  "version": "fixed-release",
+  "source": "Provider, release, provenance URL and any formatting steps",
+  "license": "Exact license, attribution and permitted local/shared use",
+  "files": [{"name": "reference.fa.gz", "url": "https://provider.example/fixed/reference.fa.gz",
+    "sha256": "REPLACE_WITH_64_LOWERCASE_HEX_DIGITS", "size": 123456}],
+  "makeudb": {"input": "reference.fa.gz", "dbmask": "none"}
+}
 ```
 
-Cluster sequences into OTU-like centroids:
+Omit `makeudb` to retain only the selected original files. If present, it generates
+`reference.udb`; `dbmask` must explicitly be `none`, `soft` or `dust`. Masking is a
+scientific choice, and UDB preserves the build-time mask: use `none` if requiring
+unmasked SINTAX FASTA/UDB equivalence. No entire catalog/family is downloaded.
 
-```bash
-taf-vsearch vsearch \
-  --cluster_fast reads.fa \
-  --id 0.97 \
-  --centroids otus.fa \
-  --uc clusters.uc
+Recommended host roots: personal `${XDG_DATA_HOME:-$HOME/.local/share}/taffish/vsearch/db`,
+or administrator-owned `/var/lib/taffish/vsearch/db` (a site may instead choose
+`/usr/local/share/taffish/vsearch/db`). `--db-root` is the container
+path of the actual bind, not a host-path discovery mechanism. A root must already
+exist, be owned by the installer, and not be group/world writable. A site
+administrator can prepare it once with an authorized installation account;
+ordinary users then bind it read-only and never need root. Do not use `chmod 777`.
+
+### Prepare once, then reuse
+
+Place `recipe.json` in the current working directory. Use a physical absolute host
+path without symlink components and with permissions allowing intended readers:
+
+```sh
+DB_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/taffish/vsearch/db"
+mkdir -p "$DB_ROOT"
+chmod 755 "$DB_ROOT"
+# Choose exactly one backend; Apptainer requires native Linux.
+export TAFFISH_CONTAINER_BACKEND=docker
+export TAFFISH_DOCKER_RUN_ARGS="--user $(id -u):$(id -g) -v '$DB_ROOT:/db-install:rw'"
+# Podman alternative:
+# export TAFFISH_CONTAINER_BACKEND=podman
+# export TAFFISH_PODMAN_RUN_ARGS="--userns keep-id --user $(id -u):$(id -g) -v '$DB_ROOT:/db-install:rw'"
+# Apptainer alternative:
+# export TAFFISH_CONTAINER_BACKEND=apptainer
+# export TAFFISH_APPTAINER_RUN_ARGS="--bind '$DB_ROOT:/db-install:rw'"
+taf-vsearch vsearch-db install --recipe recipe.json --db-root /db-install --rights-reviewed --dry-run
+taf-vsearch vsearch-db install --recipe recipe.json --db-root /db-install --rights-reviewed
 ```
 
-Run de novo chimera detection:
+Review the displayed URLs, member inventory, download size and disk reserve before
+installation. `--reserve-gb` defaults to 10 GiB in addition to downloads; increase
+it for large UDB generation. Network access is needed only for explicit acquisition.
+For offline import, put exact named files in `acquired/` and append
+`--source-dir acquired`. Repeating the same command resumes network transfer or
+verifies an already-complete identical recipe. A different recipe needs a new
+version. On damage, stop and inspect the exact member/cache/lock; do not delete an
+active lock or overwrite a shared release. No `--force` repair is provided.
 
-```bash
-taf-vsearch vsearch \
-  --uchime_denovo reads.fa \
-  --nonchimeras clean.fa \
-  --chimeras chimera.fa
+For analysis replace the install bind with a read-only bind using the same backend:
+
+```sh
+export TAFFISH_DOCKER_RUN_ARGS="-v '$DB_ROOT:/db:ro'"
+export TAFFISH_PODMAN_RUN_ARGS="-v '$DB_ROOT:/db:ro'"
+export TAFFISH_APPTAINER_RUN_ARGS="--bind '$DB_ROOT:/db:ro'"
+taf-vsearch vsearch-db verify --db-root /db --id chosen-reference--fixed-release
+taf-vsearch vsearch --sintax queries.fa --db /db/chosen-reference--fixed-release/reference.udb --tabbedout taxonomy.tsv --randseed 42
+unset TAFFISH_DOCKER_RUN_ARGS TAFFISH_PODMAN_RUN_ARGS TAFFISH_APPTAINER_RUN_ARGS
 ```
 
-Filter FASTQ reads:
+These environment variables are explicit local/site mount policy, not mandatory
+app-specific runtime settings. Preserve any other necessary site options when
+setting them. No automatic mount is claimed. Manual fallback for every backend:
+put a legally acquired FASTA/UDB in the working directory and pass `--db local.fa`;
+optionally run `vsearch --makeudb_usearch local.fa --output local.udb --dbmask none`.
+Keep the source release/checksum/license alongside it even without the helper.
 
-```bash
-taf-vsearch vsearch \
-  --fastq_filter reads.fq \
-  --fastq_maxee 1.0 \
-  --fastaout filtered.fa
-```
+SILVA data/taxonomy is one possible source, not a selected default. Its
+[license information](https://www.arb-silva.de/silva-license-information/) specifies
+CC BY 4.0 attribution and additional DSI notices; review the exact selected file's
+terms and intended sharing. Other providers may impose different conditions.
+`--rights-reviewed` records an explicit operator acknowledgement, not legal advice
+or automatic permission. Software and database licenses are separate.
 
-Merge paired-end FASTQ reads:
+## Backend, write map and validation
 
-```bash
-taf-vsearch vsearch \
-  --fastq_mergepairs R1.fq \
-  --reverse R2.fq \
-  --fastqout merged.fq
-```
+Docker/Podman execute native Linux images; on macOS they use Linux VMs. Apptainer
+runs on native Linux with an actual read-only SIF. All three use the same thin
+`<taf-app:container:...>` entry and explicit command mode. No backend-specific
+algorithm, privilege, GPU or network service options are required.
 
-## Command-Mode Notes
+Image paths `/opt`, `/usr` and `/var` are read-only at runtime. Temporary files use
+unique `/tmp` directories; outputs use the working directory; only explicit
+installation writes to the bound resource root. Analysis binds resources read-only.
+Apptainer must have writable private temporary/work directories and sufficient
+space. Linux arm64 Apptainer is conceptually supported but not a separate validation
+claim unless recorded below; it is not a macOS runtime.
 
-This is a thin TAFFISH wrapper:
+Current native validation:
 
-```taf
-<taf-app:container:ghcr.io/taffish/vsearch:2.31.0-r1>
-vsearch ::*ARGV*::
-```
+| Platform / backend | Exact offline smoke | Wrapper / actual resource bind |
+| --- | --- | --- |
+| xjp Linux amd64 / Docker | normal + read-only PASS | ordinary user PASS |
+| xjp Linux amd64 / Podman | normal + read-only PASS | ordinary user PASS |
+| xjp Linux amd64 / Apptainer | actual read-only SIF PASS | ordinary user PASS |
+| Linux VM arm64 / Podman | normal + read-only PASS | ordinary user PASS |
+| Linux VM arm64 / Docker | read-only PASS | interrupted by Docker Desktop failure |
+| Linux arm64 / Apptainer | not separately validated | not separately validated |
 
-Use explicit command-mode calls for clarity:
+Both native platforms were built using the canonical app-root Docker context.
+The Docker Desktop failure occurred after the successful arm64 build/direct smoke;
+the same arm64 OCI was loaded into Podman for complete validation. Docker's backend
+gate is independently covered on native amd64. No app-specific runtime arguments,
+architecture-specific resource format or observed coupling requires ARM SIF as an
+additional gate; it remains an untested combination, not a native ARM failure.
+No QEMU result is reported as native evidence and no backend exception is used.
 
-```bash
-taf-vsearch vsearch --usearch_global queries.fa --db database.fa --id 0.97 --blast6out hits.tsv
-```
+The 18 manifest checks passed in eight fresh-container matrices (144 commands).
+Actual wrapper tests additionally cover read-only roots, spaced paths, host-owned
+outputs, installation, idempotence, missing members, fake-mount rejection and
+read-only analysis. On xjp, one container-root-owned synthetic installation was
+reused by ordinary users across all three backends and by a second numeric UID;
+writes were denied, including with a writable bind. The private fixture was cleaned.
+HTTPS interruption/Range resumption and visible original exit-37 diagnostics passed
+on all three backends. These are tiny mechanism tests: no full production reference,
+real system-directory installation or production scientific compatibility is claimed.
 
-Option-leading shorthand also works for the default upstream command:
+Image sizes are 136,721,997 bytes (amd64) and 165,900,313 bytes (arm64), uncompressed.
+VSEARCH/docs use about 3 MiB; Python standard library about 27–28 MiB. The base,
+shared libraries and Python/curl support explicit resource acquisition. APT lists,
+package/download archives, build sources, headers and compiler are absent. Runtime
+Python standard-library bytecode is retained for imports; no app-generated bytecode
+is written. Copyright notices and upstream manuals/completions are retained.
 
-```bash
-taf-vsearch -- --help
-taf-vsearch -- --version
-```
+Build-time checks are deliberately small: version, ordinary help, libraries and
+tiny sequence operations, with no rendered manual, terminal-width dependency,
+GUI/browser, network acquisition, CPU-feature assumption or benchmark threshold.
+Runtime smoke additionally checks FASTQ merging/filtering, new 2.32 paths, UDB/
+SINTAX equivalence, corrupt input rejection and resource integrity. Synthetic
+fixtures do not validate a production database or ecological interpretation.
 
-## Inputs And Outputs
+## License and citation
 
-Common inputs:
+Upstream license files are retained in `/opt/vsearch/share/licenses`; Debian
+dependency notices remain under `/usr/share/doc`. No license notices are stripped.
+Reference providers retain their own license and citation requirements.
 
-- FASTA, FASTQ, and SFF sequence files.
-- gzip-compressed `.gz` and bzip2-compressed `.bz2` FASTA/FASTQ files.
-- User-provided reference FASTA databases through `--db`.
-- VSEARCH UDB databases created with `--makeudb_usearch`.
-
-Common outputs:
-
-- FASTA/FASTQ sequence files from filtering, merging, dereplication, sorting,
-  masking, reverse-complementing, or clustering.
-- UC clustering output, BIOM/mothur/OTU-style tables, BLAST6, SAM, alignment,
-  and user-defined tabular output depending on selected command family.
-- Logs and statistics tables for FASTQ and search workflows.
-
-## Runtime Boundaries
-
-No external database, reference bundle, network service, GPU, MPI runtime, or
-license server is required. VSEARCH workflows that use `--db`, `--sintax`, or
-UDB commands expect the user to provide the relevant reference FASTA or UDB
-files.
-
-VSEARCH is for nucleotide sequences. Upstream states that it does not support
-amino acid sequences or local alignments. Large all-vs-all alignment and
-clustering tasks can require substantial RAM, CPU, and temporary disk; memory
-usage grows with sequence lengths, identity thresholds, and thread counts.
-
-The smoke test validates a tiny offline path only. It does not replace
-scientific validation of a production microbiome pipeline, reference database,
-taxonomy assignment, or OTU/ASV interpretation.
-
-## Platforms
-
-The official VSEARCH release provides Linux binaries for multiple 64-bit
-architectures. This TAFFISH app requests native `linux/amd64` and `linux/arm64`
-container images:
-
-- `linux/amd64` uses the upstream `linux-x86_64` binary.
-- `linux/arm64` uses the upstream `linux-aarch64` binary.
-
-## Testing
-
-The smoke coverage checks:
-
-- command existence
-- upstream version string `vsearch v2.31.0`
-- core help entries for search, FASTQ merging, and chimera detection
-- dynamic library resolution with `ldd`
-- a small real workflow covering `--fastx_uniques`, `--usearch_global`,
-  gzip input, bzip2 input, `--sortbylength`, and `--fastx_revcomp`
-
-## License And Citation
-
-The TAFFISH wrapper metadata and documentation are distributed under
-`Apache-2.0`.
-
-Upstream VSEARCH is dual-licensed under either `GPL-3.0-or-later` or
-`BSD-2-Clause`. The upstream distribution also includes third-party license
-notices for bundled or optional components such as CityHash, DUST-derived code,
-MD5/SHA1 code, zlib, bzip2, and Autoconf-generated files. The upstream license
-files are preserved under `/opt/vsearch/share/licenses/vsearch`.
-
-Please cite:
-
-Rognes T, Flouri T, Nichols B, Quince C, Mahe F. VSEARCH: a versatile open
-source tool for metagenomics. PeerJ. 2016;4:e2584. DOI:
-`10.7717/peerj.2584`.
-
-## Upstream Resources
-
-- Source and releases: <https://github.com/torognes/vsearch>
-- Tagged release: <https://github.com/torognes/vsearch/releases/tag/v2.31.0>
-- Online documentation: <https://torognes.github.io/vsearch/>
-- Manual PDF: <https://github.com/torognes/vsearch/releases/download/v2.31.0/vsearch_manual.pdf>
-- Bioconda recipe: <https://bioconda.github.io/recipes/vsearch/README.html>
+Rognes T, Flouri T, Nichols B, Quince C, Mahé F. VSEARCH: a versatile open source
+tool for metagenomics. PeerJ 4:e2584 (2016), [doi:10.7717/peerj.2584](https://doi.org/10.7717/peerj.2584).

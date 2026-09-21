@@ -1,0 +1,6 @@
+{
+  "artifact": "taf-vsearch-v2.32.0-r1",
+  "schema": "taffish.build/v1",
+  "source_sha256": "4dad455bf5528ce3de9f1a786fe2d8e432d9f9eb718cc0ba7fb3b115200f3259",
+  "wrapper_sha256": "aaf648d511fad310561e7bf273b9b4ba7ac86ffd45e8364447971d9b3ece6864"
+}

@@ -1,159 +1,55 @@
-FROM debian:12-slim
-
-ARG VSEARCH_VERSION=2.31.0
+FROM debian:12-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
+ARG VSEARCH_VERSION=2.32.0
 ARG TARGETARCH
-ARG VSEARCH_AMD64_SHA256=1f07aec19cdeaf2a0ce8d9e3c9e6bb76a5cbf54e86d40bc50cb314a06ace2a16
-ARG VSEARCH_ARM64_SHA256=b053c0da34b48b5f05ce16268e46bc6dfe3458ab6c0ba688db786045c7e94f43
-
-ENV DEBIAN_FRONTEND=noninteractive
-
+ARG VSEARCH_AMD64_SHA256=c9d7ad4e10e942286ad84004a913e0f2f82957f6156c97a7d6d2389750dd6e41
+ARG VSEARCH_ARM64_SHA256=43296e39f29aa7fcd5e3aadcc1a3f0dee910840d8d0d84cf07a78c61b4a75a11
+ARG VSEARCH_SOURCE_SHA256=99578a8b960a0fb87c1f19dc65aedecddc01cfa91851b697dac8294dd08a6ceb
+ENV DEBIAN_FRONTEND=noninteractive PYTHONDONTWRITEBYTECODE=1 \
+    TAFFISH_ENV=TAFFISH TAFFISH_NAME=vsearch TAFFISH_VERSION=2.32.0 TAFFISH_RELEASE=1
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN set -eux; \
     for attempt in 1 2 3 4 5; do \
-      if apt-get -o Acquire::Retries=3 update \
-       && apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
-            bash \
-            bzip2 \
-            ca-certificates \
-            coreutils \
-            curl \
-            file \
-            grep \
-            gzip \
-            libc-bin \
-            libbz2-1.0 \
-            libgomp1 \
-            libstdc++6 \
-            sed \
-            tar \
-            zlib1g; then \
-        break; \
-      fi; \
-      if [ "${attempt}" = "5" ]; then exit 1; fi; \
-      apt-get clean; \
-      rm -rf /var/lib/apt/lists/*; \
-      sleep 5; \
+      if apt-get -o Acquire::Retries=3 update && apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+        bash bzip2 ca-certificates coreutils curl file grep gzip libc-bin libbz2-1.0 \
+        libgomp1 libstdc++6 python3 sed tar zlib1g; then break; fi; \
+      if [ "$attempt" = 5 ]; then exit 1; fi; \
+      apt-get clean; rm -rf /var/lib/apt/lists/*; sleep 5; \
     done; \
     rm -rf /var/lib/apt/lists/*
-
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-
 RUN set -eux; \
-    arch="${TARGETARCH:-}"; \
-    if [ -z "${arch}" ]; then \
-      case "$(uname -m)" in \
-        x86_64) arch="amd64" ;; \
-        aarch64) arch="arm64" ;; \
-        *) echo "unsupported build architecture: $(uname -m)" >&2; exit 1 ;; \
-      esac; \
-    fi; \
-    case "${arch}" in \
-      amd64) \
-        asset="vsearch-${VSEARCH_VERSION}-linux-x86_64.tar.gz"; \
-        root="vsearch-${VSEARCH_VERSION}-linux-x86_64"; \
-        sha256="${VSEARCH_AMD64_SHA256}" ;; \
-      arm64) \
-        asset="vsearch-${VSEARCH_VERSION}-linux-aarch64.tar.gz"; \
-        root="vsearch-${VSEARCH_VERSION}-linux-aarch64"; \
-        sha256="${VSEARCH_ARM64_SHA256}" ;; \
-      *) echo "unsupported TARGETARCH: ${arch}" >&2; exit 1 ;; \
+    arch="${TARGETARCH:-$(dpkg --print-architecture)}"; \
+    case "$arch" in \
+      amd64) platform=linux-x86_64; sha256="$VSEARCH_AMD64_SHA256" ;; \
+      arm64) platform=linux-aarch64; sha256="$VSEARCH_ARM64_SHA256" ;; \
+      *) echo "unsupported TARGETARCH: $arch" >&2; exit 1 ;; \
     esac; \
+    asset="vsearch-${VSEARCH_VERSION}-${platform}.tar.gz"; \
     curl --retry 5 --retry-delay 2 --retry-all-errors -fsSL \
-      "https://github.com/torognes/vsearch/releases/download/v${VSEARCH_VERSION}/${asset}" \
-      -o /tmp/vsearch.tar.gz; \
-    echo "${sha256}  /tmp/vsearch.tar.gz" | sha256sum -c -; \
-    mkdir -p /tmp/vsearch-src /opt/vsearch/bin /opt/vsearch/share/doc/vsearch \
-      /opt/vsearch/share/licenses/vsearch /opt/vsearch/share/man/man1 /opt/vsearch/share/testdata; \
-    tar -xzf /tmp/vsearch.tar.gz -C /tmp/vsearch-src; \
-    install -m 0755 "/tmp/vsearch-src/${root}/bin/vsearch" /opt/vsearch/bin/vsearch; \
-    install -m 0644 "/tmp/vsearch-src/${root}/README.md" /opt/vsearch/share/doc/vsearch/README.md; \
-    install -m 0644 "/tmp/vsearch-src/${root}/LICENSE.txt" /opt/vsearch/share/licenses/vsearch/LICENSE.txt; \
-    install -m 0644 "/tmp/vsearch-src/${root}/LICENSE_GNU_GPL3.txt" /opt/vsearch/share/licenses/vsearch/LICENSE_GNU_GPL3.txt; \
-    install -m 0644 "/tmp/vsearch-src/${root}/man/vsearch.1" /opt/vsearch/share/man/man1/vsearch.1; \
-    install -m 0644 "/tmp/vsearch-src/${root}/doc/vsearch_manual.pdf" /opt/vsearch/share/doc/vsearch/vsearch_manual.pdf; \
-    ln -sf /opt/vsearch/bin/vsearch /usr/local/bin/vsearch; \
-    { \
-      printf "upstream_repo=https://github.com/torognes/vsearch\n"; \
-      printf "upstream_tag=v%s\n" "${VSEARCH_VERSION}"; \
-      printf "runtime_source=official GitHub release binary\n"; \
-      printf "runtime_asset=%s\n" "${asset}"; \
-      printf "runtime_asset_sha256=%s\n" "${sha256}"; \
-      printf "target_arch=%s\n" "${arch}"; \
-    } > /opt/vsearch/share/doc/vsearch/source.txt; \
-    rm -rf /tmp/vsearch.tar.gz /tmp/vsearch-src
-
-RUN cat > /opt/vsearch/share/testdata/vsearch-smoke.sh <<'EOF'
-#!/bin/sh
-set -eu
-
-tmp="${1:-/tmp/taf-vsearch-smoke-$$}"
-rm -rf "$tmp"
-mkdir -p "$tmp"
-trap 'rm -rf "$tmp"' EXIT
-cd "$tmp"
-
-run_logged() {
-  log="$1"
-  shift
-  if ! "$@" > "$log" 2>&1; then
-    cat "$log" >&2
-    exit 1
-  fi
-}
-
-cat > reads.fa <<'FASTA'
->read1
-ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT
->read2
-ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT
->read3
-ACGTACGTACGTACGTACGTACGTACGTACGTTCGTACGTACGTACGTACGTACGTACGTACGT
-FASTA
-
-cat > queries.fa <<'FASTA'
->query1
-ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT
-FASTA
-
-cat > db.fa <<'FASTA'
->db1
-ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT
->db2
-TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
-FASTA
-
-run_logged uniques.log vsearch --fastx_uniques reads.fa --fastaout uniques.fa --sizeout --threads 1
-test -s uniques.fa
-grep -F ';size=2' uniques.fa >/dev/null || { cat uniques.fa >&2; exit 1; }
-grep -F ';size=1' uniques.fa >/dev/null || { cat uniques.fa >&2; exit 1; }
-
-run_logged search.log vsearch --usearch_global queries.fa --db db.fa --id 0.90 --blast6out hits.tsv --threads 1
-test -s hits.tsv
-grep -F 'query1' hits.tsv >/dev/null || { cat hits.tsv >&2; exit 1; }
-grep -F 'db1' hits.tsv >/dev/null || { cat hits.tsv >&2; exit 1; }
-
-gzip -c reads.fa > reads.fa.gz
-run_logged sort.log vsearch --sortbylength reads.fa.gz --output sorted.fa --threads 1
-test -s sorted.fa
-grep -F '>read1' sorted.fa >/dev/null || { cat sorted.fa >&2; exit 1; }
-
-bzip2 -c reads.fa > reads.fa.bz2
-run_logged revcomp.log vsearch --fastx_revcomp reads.fa.bz2 --fastaout revcomp.fa --threads 1
-test -s revcomp.fa
-grep -F '>read1' revcomp.fa >/dev/null || { cat revcomp.fa >&2; exit 1; }
-EOF
-
-RUN set -eux; \
-    chmod 0755 /opt/vsearch/share/testdata/vsearch-smoke.sh; \
-    vsearch --version 2>&1 | grep -F "vsearch v${VSEARCH_VERSION}" >/dev/null; \
-    vsearch --help 2>&1 | grep -F -- "--usearch_global" >/dev/null; \
-    vsearch --help 2>&1 | grep -F -- "--fastq_mergepairs" >/dev/null; \
-    vsearch --help 2>&1 | grep -F -- "--uchime_denovo" >/dev/null; \
-    /opt/vsearch/share/testdata/vsearch-smoke.sh /tmp/vsearch-build-smoke; \
-    ldd "$(command -v vsearch)" > /tmp/vsearch-ldd.txt 2>&1 || true; \
-    if grep -F "not found" /tmp/vsearch-ldd.txt; then exit 1; fi; \
-    rm -f /tmp/vsearch-ldd.txt
-
-WORKDIR /root
-
-ENV TAFFISH_ENV=TAFFISH
-ENV TAFFISH_NAME=vsearch
+      "https://github.com/torognes/vsearch/releases/download/v${VSEARCH_VERSION}/${asset}" -o /tmp/binary.tar.gz; \
+    echo "$sha256  /tmp/binary.tar.gz" | sha256sum -c -; \
+    mkdir -p /tmp/vsearch-binary /tmp/vsearch-source /opt/vsearch/bin /opt/vsearch/share/{doc,licenses,testdata,man,completion} /work; \
+    tar -xzf /tmp/binary.tar.gz -C /tmp/vsearch-binary --strip-components=1; \
+    install -m 0755 /tmp/vsearch-binary/bin/vsearch /opt/vsearch/bin/vsearch; \
+    install -m 0644 /tmp/vsearch-binary/README.md /opt/vsearch/share/doc/; \
+    cp -a /tmp/vsearch-binary/man/. /opt/vsearch/share/man/; \
+    cp /tmp/vsearch-binary/LICENSE*.txt /opt/vsearch/share/licenses/; \
+    curl --retry 5 --retry-delay 2 --retry-all-errors -fsSL \
+      "https://github.com/torognes/vsearch/releases/download/v${VSEARCH_VERSION}/vsearch-${VSEARCH_VERSION}.tar.gz" -o /tmp/source.tar.gz; \
+    echo "$VSEARCH_SOURCE_SHA256  /tmp/source.tar.gz" | sha256sum -c -; \
+    tar -xzf /tmp/source.tar.gz -C /tmp/vsearch-source --strip-components=1; \
+    cp /tmp/vsearch-source/completion/completions/{vsearch,_vsearch,vsearch.fish} /opt/vsearch/share/completion/; \
+    cp /tmp/vsearch-source/completion/README.md /opt/vsearch/share/completion/; \
+    cp /tmp/vsearch-source/NEWS /opt/vsearch/share/doc/; \
+    ln -s /opt/vsearch/bin/vsearch /usr/local/bin/vsearch; \
+    printf 'tag=v%s\ncommit=d44d6da51f7fe0b4281f02af76d04923f2075e61\nasset=%s\nasset_sha256=%s\nsource_sha256=%s\n' \
+      "$VSEARCH_VERSION" "$asset" "$sha256" "$VSEARCH_SOURCE_SHA256" > /opt/vsearch/share/doc/source.txt; \
+    dpkg-query -W > /opt/vsearch/share/doc/dpkg-packages.tsv; \
+    rm -rf /tmp/binary.tar.gz /tmp/source.tar.gz /tmp/vsearch-binary /tmp/vsearch-source
+COPY docker/vsearch-db.py /usr/local/bin/vsearch-db
+COPY docker/vsearch-smoke.py docker/vsearch-resource-smoke.py /opt/vsearch/share/testdata/
+RUN set -eux; chmod 0755 /usr/local/bin/vsearch-db; \
+    python3 /opt/vsearch/share/testdata/vsearch-smoke.py identity; \
+    python3 /opt/vsearch/share/testdata/vsearch-smoke.py core; \
+    vsearch-db --version
+WORKDIR /work
+ENTRYPOINT []
